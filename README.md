@@ -37,7 +37,7 @@ Gradescope hides notebook files larger than 1MB and displays the message **"Larg
 4. Select the `chrome-extension` folder (the one containing `manifest.json`)
 5. The extension will be loaded and ready to use!
 
-**Note**: Chrome version is currently untested. Use Firefox version for tested functionality.
+**Note**: Chrome version uses Manifest V3 and has been tested.
 
 ### Firefox Installation
 
@@ -101,9 +101,13 @@ Access settings by clicking the **⚙️** gear icon on the Gradescope page.
 
 ## Technical Details
 
-- **Manifest Version**: 2 (compatible with both Chrome and Firefox)
+- **Manifest Version**: 
+  - Chrome: Manifest V3 (uses service worker)
+  - Firefox: Manifest V2 (uses persistent background script)
 - **Content Script**: Injected on Gradescope pages at document_start
 - **Background Script**: Handles notebook fetching with parallel downloads and CORS bypass
+  - Chrome: Service worker (non-persistent)
+  - Firefox: Persistent background script
 - **Storage**: Uses browser's local storage for settings persistence
 - **CORS**: Background script handles cross-origin requests to S3
 - **File Detection**: Validates file type (PDF vs notebook) before parsing
@@ -112,11 +116,11 @@ Access settings by clicking the **⚙️** gear icon on the Gradescope page.
 
 ## Browser Compatibility
 
-- ⚠️ Chrome (untested - use at your own risk)
-- ✅ Firefox (tested under debug mode)
+- ✅ Chrome (tested, uses Manifest V3)
+- ✅ Firefox (tested under debug mode, uses Manifest V2)
 - Both versions are in separate folders:
-  - `chrome-extension/` - Chrome version
-  - `firefox-addon/` - Firefox version
+  - `chrome-extension/` - Chrome version (Manifest V3)
+  - `firefox-addon/` - Firefox version (Manifest V2)
 
 ## Known Issues & Solutions
 

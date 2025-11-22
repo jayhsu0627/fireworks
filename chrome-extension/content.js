@@ -238,11 +238,45 @@ function fetchAndDisplayNotebook(downloadUrl) {
     sendFetchMessage(connections);
   });
   
-  function sendFetchMessage(connections) {
+  function sendFetchMessage(connections, retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 500; // 500ms delay between retries
+    
+    // Check if background script is available
+    if (!browserAPI.runtime || !browserAPI.runtime.sendMessage) {
+      console.error('🎆 Fireworks: Runtime API not available');
+      const loading = document.querySelector('.fireworks-loading');
+      if (loading) {
+        loading.innerHTML = `<div class="fireworks-error">Error: Extension runtime not available. Please reload the page and try again.</div>`;
+      }
+      return;
+    }
     
     browserAPI.runtime.sendMessage(
       { action: 'fetchNotebook', url: downloadUrl, connections: connections },
       (response) => {
+      // Check for runtime errors (e.g., service worker not running)
+      if (browserAPI.runtime.lastError) {
+        const errorMsg = browserAPI.runtime.lastError.message;
+        console.error('🎆 Fireworks: Runtime error:', errorMsg);
+        
+        // If it's a connection error and we haven't retried too many times, retry
+        if ((errorMsg.includes('connection') || errorMsg.includes('Receiving end does not exist')) && retryCount < maxRetries) {
+          console.log(`🎆 Fireworks: Retrying message send (attempt ${retryCount + 1}/${maxRetries})...`);
+          setTimeout(() => {
+            sendFetchMessage(connections, retryCount + 1);
+          }, retryDelay * (retryCount + 1)); // Exponential backoff
+          return;
+        }
+        
+        // Show error to user
+        const loading = document.querySelector('.fireworks-loading');
+        if (loading) {
+          loading.innerHTML = `<div class="fireworks-error">Error: ${escapeHtml(errorMsg)}<br><br>Try downloading the file directly instead.</div>`;
+        }
+        return;
+      }
+      
       // Complete progress bar when done - re-query in case container was recreated
       const finalContainer = document.getElementById('fireworks-viewer-container');
       if (finalContainer) {
@@ -254,15 +288,6 @@ function fetchAndDisplayNotebook(downloadUrl) {
         if (finalLoadingText) {
           finalLoadingText.textContent = 'Loading notebook... 100%';
         }
-      }
-      
-      if (browserAPI.runtime.lastError) {
-        console.error('🎆 Fireworks: Runtime error:', browserAPI.runtime.lastError.message);
-        const loading = document.querySelector('.fireworks-loading');
-        if (loading) {
-          loading.innerHTML = `<div class="fireworks-error">Error: ${escapeHtml(browserAPI.runtime.lastError.message)}<br><br>Try downloading the file directly instead.</div>`;
-        }
-        return;
       }
       
       if (response && response.success) {

@@ -1,11 +1,18 @@
 // Background service worker for Fireworks extension
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Fireworks extension installed');
+  console.log('🎆 Fireworks [Background]: Extension installed');
+});
+
+// Wake up the service worker when extension starts
+chrome.runtime.onStartup.addListener(() => {
+  console.log('🎆 Fireworks [Background]: Extension started');
 });
 
 // Handle fetch requests from content script to avoid CORS issues
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Log that we received a message (helps debug service worker state)
   if (request.action === 'fetchNotebook') {
+    console.log('🎆 Fireworks [Background]: Received fetchNotebook request');
     // Store the tab ID from the sender
     const tabId = sender && sender.tab ? sender.tab.id : null;
     
