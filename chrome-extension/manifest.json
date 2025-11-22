@@ -1,0 +1,44 @@
+{
+  "manifest_version": 2,
+  "name": "Fireworks - Gradescope Large File Viewer",
+  "version": "1.0.0",
+  "description": "Preview and work with large Jupyter notebooks on Gradescope without downloading. Chrome extension for debugging/development use.",
+  
+  "permissions": [
+    "*://gradescope.com/*",
+    "*://*.gradescope.com/*",
+    "*://production-gradescope-uploads.s3-us-west-2.amazonaws.com/*",
+    "*://*.s3.amazonaws.com/*",
+    "*://*.s3-us-west-2.amazonaws.com/*",
+    "activeTab",
+    "storage"
+  ],
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "*://gradescope.com/*",
+        "*://*.gradescope.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_start"
+    }
+  ],
+  
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  
+  "icons": {
+    "16": "images/icon-16.png",
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
+  },
+  
+  "browser_action": {
+    "default_title": "Fireworks - Gradescope Viewer"
+  }
+}
+

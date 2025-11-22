@@ -1,0 +1,31 @@
+# Chrome extension files
+*.crx
+*.pem
+
+# Firefox extension files
+*.xpi
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+
+# Jupyter notebook files (if they're test files)
+*.ipynb_checkpoints
+
