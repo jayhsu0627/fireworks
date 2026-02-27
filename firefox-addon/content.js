@@ -1385,7 +1385,7 @@ function setupSettingsPanel() {
 function createPanelWithValue(panel, savedConnections, savedSearchText) {
   panel.innerHTML = `
       <div class="fireworks-settings-content-page" style="background: white; border-radius: 12px; padding: 25px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
-        <h4 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">Download Settings</h4>
+        <h4 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">Fireworks Settings</h4>
         <label style="display: flex; align-items: center; font-size: 14px; color: #333; font-weight: 500; margin-bottom: 15px;">
           Parallel Connections:
           <input type="number" id="fireworks-connections-input-page" min="1" max="50" value="${savedConnections}" style="width: 80px; margin-left: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
@@ -1396,7 +1396,27 @@ function createPanelWithValue(panel, savedConnections, savedSearchText) {
           <input type="text" id="fireworks-search-text-input-page" value="${savedSearchText || ''}" placeholder="Enter text to search in notebook" style="width: 100%; margin-top: 5px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
         </label>
         <p style="font-size: 12px; color: #666; margin: 0 0 20px 0;">This text will be highlighted when notebook opens (like Ctrl+F)</p>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <hr style="margin: 10px 0 16px 0; border: none; border-top: 1px solid #eee;">
+        <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #333;">Gradescope Autopilot Grading</h4>
+        <p style="font-size: 12px; color: #666; margin: 0 0 10px 0;">
+          On Gradescope grading pages, this can repeatedly apply a rubric option and move to the next ungraded submission by simulating key presses.
+        </p>
+        <label style="display: flex; align-items: center; font-size: 14px; color: #333; font-weight: 500; margin-bottom: 10px;">
+          Rubric option number to apply (0-9):
+          <input type="number" id="fireworks-autopilot-score" min="0" max="9" value="1" style="width: 60px; margin-left: 10px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
+        </label>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+          <button id="fireworks-autopilot-start" style="padding: 6px 12px; border: none; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; background: #10b981; color: white;">
+            Start autopilot
+          </button>
+          <button id="fireworks-autopilot-stop" style="padding: 6px 12px; border: none; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; background: #ef4444; color: white;">
+            Stop autopilot
+          </button>
+        </div>
+        <p id="fireworks-autopilot-status" style="font-size: 12px; color: #666; margin: 0 0 16px 0;">
+          Autopilot status: Idle
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px;">
           <button id="fireworks-settings-cancel-page" class="fireworks-settings-cancel-btn" style="padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; background: #e0e0e0; color: #333;">Cancel</button>
           <button id="fireworks-settings-save-page" class="fireworks-settings-save-btn" style="padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">Save</button>
         </div>
@@ -1443,6 +1463,50 @@ function setupSettingsPanelHandlers(panel, defaultValue) {
   document.getElementById('fireworks-settings-cancel-page').addEventListener('click', () => {
     panel.style.display = 'none';
   });
+
+  // Autopilot controls (only present on some pages)
+  const autopilotStartBtn = document.getElementById('fireworks-autopilot-start');
+  const autopilotStopBtn = document.getElementById('fireworks-autopilot-stop');
+
+  if (autopilotStartBtn) {
+    autopilotStartBtn.addEventListener('click', () => {
+      const scoreInput = document.getElementById('fireworks-autopilot-score');
+      if (!scoreInput) {
+        return;
+      }
+      let scoreStr = String(scoreInput.value || '').trim();
+      if (scoreStr === '') {
+        scoreStr = '1';
+      }
+      if (!/^[0-9]$/.test(scoreStr)) {
+        alert('Please enter a single digit between 0 and 9 for the rubric option.');
+        return;
+      }
+
+      if (!isGradescopeGradingPage()) {
+        alert('Gradescope autopilot only works on a Gradescope grading page (question/submission view).');
+        return;
+      }
+
+      const confirmed = window.confirm(
+        'Fireworks autopilot will repeatedly apply rubric option "' +
+        scoreStr +
+        '" and press Gradescope\'s "Next ungraded" (keyboard shortcut "z") until you stop it.\n\n' +
+        'Make sure you really want to assign this same option to all remaining ungraded submissions for this question.'
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      startGradescopeAutopilot(scoreStr);
+    });
+  }
+
+  if (autopilotStopBtn) {
+    autopilotStopBtn.addEventListener('click', () => {
+      stopGradescopeAutopilot('Stopped by user.');
+    });
+  }
 }
 
 function showSettingsPanel() {
@@ -1494,4 +1558,260 @@ function showSettingsPanel() {
       }
     }
   });
+}
+
+// ================================
+// Gradescope auto-grading helpers
+// ================================
+
+// Detect if we're on a Gradescope grading page where shortcuts make sense
+function isGradescopeGradingPage() {
+  const host = window.location.hostname || '';
+  const path = window.location.pathname || '';
+
+  if (!/gradescope\.com$/.test(host) && !/\.gradescope\.com$/.test(host)) {
+    return false;
+  }
+
+  // Heuristic: question grading URLs usually contain "/questions/" or "/submissions/"
+  if (path.includes('/questions/') || path.includes('/submissions/')) {
+    return true;
+  }
+
+  // Fallback: look for a Next Ungraded button in the DOM
+  const nextBtn = findNextUngradedButton();
+  return !!nextBtn;
+}
+
+function findScoreInput() {
+  // Try several selectors that commonly match Gradescope's score input
+  const selectors = [
+    'input[aria-label="Score"]',
+    'input[aria-label*="Score"]',
+    'input[name="score"]',
+    'input[type="number"][class*="score"]',
+    'input[type="number"][data-testid*="score"]',
+    'input[type="number"]'
+  ];
+
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el) return el;
+  }
+  return null;
+}
+
+function findNextUngradedButton() {
+  // Prefer explicit data-testid/aria labels if present
+  const explicitSelectors = [
+    '[data-testid="next-ungraded"]',
+    'button[aria-label*="Next Ungraded"]',
+    'button[aria-label*="next ungraded"]'
+  ];
+
+  for (const sel of explicitSelectors) {
+    const el = document.querySelector(sel);
+    if (el) return el;
+  }
+
+  // Fallback: search all buttons for visible text
+  const candidates = Array.from(document.querySelectorAll('button, a[role="button"]'));
+  return candidates.find(btn => {
+    const text = (btn.innerText || btn.textContent || '').trim().toLowerCase();
+    return text.includes('next ungraded');
+  }) || null;
+}
+
+// Set numeric score directly and then go to "Next ungraded"
+function setScoreAndAdvance(scoreDigit) {
+  const key = String(scoreDigit);
+
+  // Find the main score input Gradescope uses for this question
+  const input = findScoreInput();
+  if (!input) {
+    console.warn('🎆 Fireworks: Could not find score input for auto-grading.');
+    return false;
+  }
+
+  // Set the value in a way React/Vue-style frameworks will notice
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+  if (nativeInputValueSetter) {
+    nativeInputValueSetter.call(input, key);
+  } else {
+    input.value = key;
+  }
+
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+
+  const nextBtn = findNextUngradedButton();
+  if (!nextBtn) {
+    console.warn('🎆 Fireworks: Next Ungraded button not found after setting score.');
+    return false;
+  }
+
+  // Give the UI a brief moment to record the score, then click "Next ungraded"
+  setTimeout(() => {
+    nextBtn.click();
+  }, 150);
+
+  return true;
+}
+
+// ================================
+// Gradescope autopilot grading
+// ================================
+
+let fireworksAutopilotRunning = false;
+let fireworksAutopilotIteration = 0;
+
+function blurAutopilotFocus() {
+  const active = document.activeElement;
+  if (
+    active &&
+    (active.tagName === 'INPUT' ||
+     active.tagName === 'TEXTAREA' ||
+     active.tagName === 'SELECT' ||
+     active.tagName === 'BUTTON' ||
+     active.isContentEditable)
+  ) {
+    try {
+      active.blur();
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Try to focus the main document body so global key handlers fire
+  if (document.body && typeof document.body.focus === 'function') {
+    try {
+      document.body.focus();
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+function setAutopilotStatus(message) {
+  const statusEl = document.getElementById('fireworks-autopilot-status');
+  if (statusEl) {
+    statusEl.textContent = 'Autopilot status: ' + message;
+  }
+}
+
+function simulateKeyPress(key) {
+  // Derive keyCode/which for common single-character keys (digits, letters)
+  const upper = key.length === 1 ? key.toUpperCase() : key;
+  const keyCode =
+    upper.length === 1 ? upper.charCodeAt(0) : 0;
+
+  const eventInit = {
+    key,
+    code: /^[0-9]$/.test(key) ? ('Digit' + key) : ('Key' + upper),
+    keyCode,
+    which: keyCode,
+    charCode: keyCode,
+    bubbles: true,
+    cancelable: true
+  };
+
+  // Dispatch on several targets so Gradescope's listeners can catch it
+  const targets = [document.activeElement, document.body, document, window];
+  ['keydown', 'keypress', 'keyup'].forEach((type) => {
+    targets.forEach((target) => {
+      if (target && typeof target.dispatchEvent === 'function') {
+        const evt = new KeyboardEvent(type, eventInit);
+        // Some code checks deprecated keyCode/which properties; force them if possible
+        try {
+          Object.defineProperty(evt, 'keyCode', { get: () => keyCode });
+          Object.defineProperty(evt, 'which', { get: () => keyCode });
+          Object.defineProperty(evt, 'charCode', { get: () => keyCode });
+        } catch (e) {
+          // Ignore if we can't override (not critical in modern browsers)
+        }
+        target.dispatchEvent(evt);
+      }
+    });
+  });
+}
+
+function stopGradescopeAutopilot(reason) {
+  if (!fireworksAutopilotRunning) {
+    if (reason) {
+      setAutopilotStatus(reason);
+    }
+    return;
+  }
+
+  fireworksAutopilotRunning = false;
+  if (reason) {
+    setAutopilotStatus(reason);
+  } else {
+    setAutopilotStatus('Stopped.');
+  }
+}
+
+function startGradescopeAutopilot(scoreDigit) {
+  const key = String(scoreDigit);
+  if (!/^[0-9]$/.test(key)) {
+    alert('Autopilot requires a single digit between 0 and 9.');
+    return;
+  }
+
+  if (!isGradescopeGradingPage()) {
+    alert('Gradescope autopilot only works on a Gradescope grading page (question/submission view).');
+    return;
+  }
+
+  fireworksAutopilotRunning = true;
+  fireworksAutopilotIteration = 0;
+  setAutopilotStatus('Running with rubric option ' + key + '...');
+
+  const maxIterations = 1000; // safety limit
+
+  function step() {
+    if (!fireworksAutopilotRunning) {
+      return;
+    }
+
+    if (!isGradescopeGradingPage()) {
+      stopGradescopeAutopilot('Stopped: left grading page.');
+      alert('Fireworks autopilot stopped because you left the Gradescope grading page.');
+      return;
+    }
+
+    if (fireworksAutopilotIteration >= maxIterations) {
+      stopGradescopeAutopilot('Stopped after ' + maxIterations + ' submissions (safety limit).');
+      alert('Fireworks autopilot reached its safety limit and stopped.');
+      return;
+    }
+
+    fireworksAutopilotIteration += 1;
+
+    // 1) Make sure focus is not inside an input/textarea/button so
+    //    Gradescope's global keyboard shortcuts will fire
+    blurAutopilotFocus();
+
+    // 2) Apply rubric option with the chosen number key
+    simulateKeyPress(key);
+
+    // 3) After a short delay, press Gradescope's built-in "next ungraded" shortcut (z)
+    setTimeout(() => {
+      if (!fireworksAutopilotRunning) {
+        return;
+      }
+
+      simulateKeyPress('z');
+
+      // 4) Wait for navigation / UI update, then continue
+      setTimeout(() => {
+        if (!fireworksAutopilotRunning) {
+          return;
+        }
+        step();
+      }, 900);
+    }, 180);
+  }
+
+  step();
 }

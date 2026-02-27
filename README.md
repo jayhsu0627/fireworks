@@ -23,9 +23,10 @@ Gradescope hides notebook files larger than 1MB and displays the message **"Larg
 3. **Jump to Question Keywords**: Define search keywords in settings (e.g., "6.2.1") that automatically highlight and scroll to when notebook opens - works like Ctrl+F but automatic.
 
 4. **Switch Page with 'z' Without Closing Window**: Navigate between student submissions using Gradescope's 'z' key. The viewer automatically reloads with the new student's notebook.
+
+5. **Gradescope Autopilot Grading (Optional)**: From the ⚙️ settings panel, enable an autopilot that repeatedly applies a chosen numeric rubric option (0–9) and triggers Gradescope's built-in **`z`** shortcut to move to the next ungraded submission. This works on grading pages for both the Chrome and Firefox versions.
+
    ![Download Progress](img/download.png)
-
-
 
 ## Installation
 
@@ -74,10 +75,12 @@ If you have a pre-built `.xpi` file and want to install unsigned extensions:
 4. Use the **⚙️** gear icon to configure:
    - Parallel download connections (1-50)
    - Search keywords for auto-jump feature
+   - Gradescope autopilot grading (rubric option number, start/stop)
 5. When grading multiple submissions:
    - Open the notebook viewer for the first student
    - Press **'z'** to navigate to the next student
    - The viewer automatically reloads with the new student's notebook
+6. (Optional) On a Gradescope grading page, open the ⚙️ panel, choose a rubric option number (0–9), and click **Start autopilot** to let Fireworks repeatedly apply that option and press **`z`** for you until you stop it.
 
 ## Settings
 
@@ -98,6 +101,12 @@ Access settings by clicking the **⚙️** gear icon on the Gradescope page.
 - Case-insensitive search
 - Automatically highlights and scrolls to first match
 - Works with markdown headers, code cells, and output text
+
+### Gradescope Autopilot Grading
+- Available from the ⚙️ settings panel on Gradescope grading pages (Chrome and Firefox).
+- Enter a single-digit rubric option (0–9) to apply to all remaining ungraded submissions for the current question.
+- Click **Start autopilot** to begin, and **Stop autopilot** (or close the page) to cancel.
+- Autopilot simulates pressing the rubric number key followed by Gradescope's **`z`** shortcut to move to the next ungraded submission. Use with care.
 
 ## Technical Details
 
