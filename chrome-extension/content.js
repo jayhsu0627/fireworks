@@ -168,8 +168,8 @@ function injectViewer(downloadUrl, fileName) {
           </div>
           <div class="fireworks-width-control">
             <label for="fireworks-width-slider" style="font-size: 12px; margin-right: 8px;">Cell Width:</label>
-            <input type="range" id="fireworks-width-slider" min="50" max="100" value="80" style="width: 80px; margin-right: 8px;">
-            <span id="fireworks-width-value" class="fireworks-width-value">80%</span>
+            <input type="range" id="fireworks-width-slider" min="50" max="100" value="60" style="width: 80px; margin-right: 8px;">
+            <span id="fireworks-width-value" class="fireworks-width-value">60%</span>
           </div>
           <button id="fireworks-close" class="fireworks-close">✕</button>
         </div>
@@ -464,7 +464,81 @@ function displayNotebookPreview(notebook) {
   });
   
   previewHTML += '</div>';
-  loading.innerHTML = previewHTML;
+  
+  // Get width value BEFORE creating elements
+  const container = document.getElementById('fireworks-viewer-container');
+  const widthSlider = container ? container.querySelector('#fireworks-width-slider') : null;
+  const width = Math.max(50, Math.min(100, parseInt(widthSlider?.value) || 60));
+  const contentArea = container ? container.querySelector('#fireworks-content-zoomable') : null;
+  
+  // Calculate width BEFORE inserting into DOM
+  let targetMaxWidth = null;
+  if (contentArea) {
+    void contentArea.offsetWidth; // Force reflow
+    const contentAreaWidth = contentArea.offsetWidth || contentArea.clientWidth;
+    if (contentAreaWidth > 0) {
+      const availableWidth = contentAreaWidth - 40;
+      targetMaxWidth = (availableWidth * width / 100) + 'px';
+    } else {
+      // Use viewer container as fallback
+      const viewerWidth = container ? (container.offsetWidth || container.clientWidth) : 0;
+      if (viewerWidth > 0) {
+        const estimatedContentWidth = viewerWidth * 0.8;
+        const availableWidth = estimatedContentWidth - 40;
+        targetMaxWidth = (availableWidth * width / 100) + 'px';
+      } else {
+        targetMaxWidth = width + '%';
+      }
+    }
+  } else {
+    targetMaxWidth = width + '%';
+  }
+  
+  // Replace the loading div entirely with the cells container
+  // This ensures the flex properties of .fireworks-loading don't interfere
+  let cellsContainer = null;
+  if (loading && loading.parentElement) {
+    // Create a new container for the cells
+    const cellsWrapper = document.createElement('div');
+    cellsWrapper.className = 'fireworks-cells-wrapper';
+    cellsWrapper.innerHTML = previewHTML;
+    
+    // Get the cells container BEFORE inserting into DOM
+    cellsContainer = cellsWrapper.querySelector('.fireworks-cells');
+    
+    // Apply styles BEFORE inserting into DOM to prevent CSS from expanding it
+    if (cellsContainer) {
+      cellsContainer.style.setProperty('min-width', '0', 'important');
+      cellsContainer.style.setProperty('width', '100%', 'important');
+      cellsContainer.style.setProperty('margin', '0 auto', 'important');
+      cellsContainer.style.setProperty('max-width', targetMaxWidth, 'important');
+      console.log('🎆 Fireworks: Applied cell width BEFORE DOM insertion:', targetMaxWidth, '(', width + '%)');
+    }
+    
+    // NOW insert into DOM with styles already applied
+    loading.parentElement.replaceChild(cellsWrapper, loading);
+  } else {
+    // Fallback: just set innerHTML if parent not found
+    loading.innerHTML = previewHTML;
+    cellsContainer = loading.querySelector('.fireworks-cells');
+    if (cellsContainer) {
+      cellsContainer.style.setProperty('min-width', '0', 'important');
+      cellsContainer.style.setProperty('width', '100%', 'important');
+      cellsContainer.style.setProperty('margin', '0 auto', 'important');
+      cellsContainer.style.setProperty('max-width', targetMaxWidth, 'important');
+      console.log('🎆 Fireworks: Applied cell width after innerHTML:', targetMaxWidth, '(', width + '%)');
+    }
+  }
+  
+  // Also apply via the function to ensure it's correct after layout completes
+  // Use multiple requestAnimationFrame calls to ensure DOM and layout are fully updated
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        applyCellWidthFromSlider();
+      });
+    });
+  });
   
   const footer = document.createElement('div');
   footer.className = 'fireworks-footer';
@@ -579,22 +653,24 @@ function highlightAndScrollToText(searchText) {
       parentElement.style.transition = 'background-color 0.3s';
       parentElement.setAttribute('data-fireworks-highlighted', 'true');
       
-      // Scroll to it
-      setTimeout(() => {
-        parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Flash effect
-        setTimeout(() => {
-          parentElement.style.backgroundColor = '#ffff00';
+      // Scroll to it - use rAF to ensure zoom/layout is applied before scrolling
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Flash effect
           setTimeout(() => {
-            parentElement.style.backgroundColor = 'yellow';
-            // Fade out after 3 seconds
+            parentElement.style.backgroundColor = '#ffff00';
             setTimeout(() => {
-              parentElement.style.backgroundColor = '';
-              parentElement.removeAttribute('data-fireworks-highlighted');
-            }, 3000);
-          }, 300);
-        }, 100);
-      }, 100);
+              parentElement.style.backgroundColor = 'yellow';
+              // Fade out after 3 seconds
+              setTimeout(() => {
+                parentElement.style.backgroundColor = '';
+                parentElement.removeAttribute('data-fireworks-highlighted');
+              }, 3000);
+            }, 300);
+          }, 100);
+        });
+      });
       
       console.log("🎆 Fireworks: Successfully highlighted and scrolled to:", normalizedSearch);
       return;
@@ -624,19 +700,21 @@ function highlightAndScrollToText(searchText) {
   
   content.innerHTML = highlightedHTML;
   
-  // Find first match and scroll to it
+  // Find first match and scroll to it - use rAF so zoom/layout is applied before scrolling
   const firstMatch = content.querySelector('mark');
   if (firstMatch) {
-    setTimeout(() => {
-      firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      firstMatch.style.transition = 'background-color 0.3s';
-      setTimeout(() => {
-        firstMatch.style.backgroundColor = '#ffff00';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstMatch.style.transition = 'background-color 0.3s';
         setTimeout(() => {
-          firstMatch.style.backgroundColor = 'yellow';
-        }, 300);
-      }, 100);
-    }, 100);
+          firstMatch.style.backgroundColor = '#ffff00';
+          setTimeout(() => {
+            firstMatch.style.backgroundColor = 'yellow';
+          }, 300);
+        }, 100);
+      });
+    });
     console.log("🎆 Fireworks: Successfully highlighted using fallback method");
   } else {
     console.log("🎆 Fireworks: Could not find match element after HTML replacement");
@@ -1915,6 +1993,78 @@ function setupZoomControls(container) {
   updateZoom(100);
 }
 
+// Apply cell width from slider - can be called when notebook content is rendered (e.g. after displayNotebookPreview)
+function applyCellWidthFromSlider() {
+  const container = document.getElementById('fireworks-viewer-container');
+  if (!container) {
+    console.log('🎆 Fireworks: applyCellWidthFromSlider - container not found');
+    return;
+  }
+  const widthSlider = container.querySelector('#fireworks-width-slider');
+  const widthValueDisplay = container.querySelector('#fireworks-width-value');
+  if (!widthSlider || !widthValueDisplay) {
+    console.log('🎆 Fireworks: applyCellWidthFromSlider - controls not found');
+    return;
+  }
+  
+  // Find cells container - it should be inside #fireworks-content-zoomable
+  const contentArea = container.querySelector('#fireworks-content-zoomable');
+  if (!contentArea) {
+    console.log('🎆 Fireworks: applyCellWidthFromSlider - content area not found');
+    return;
+  }
+  
+  const cellsContainer = contentArea.querySelector('.fireworks-cells');
+  if (!cellsContainer) {
+    console.log('🎆 Fireworks: applyCellWidthFromSlider - cells container not found, will retry');
+    // Retry after a short delay
+    setTimeout(() => {
+      applyCellWidthFromSlider();
+    }, 100);
+    return;
+  }
+  
+  const width = Math.max(50, Math.min(100, parseInt(widthSlider.value) || 60));
+  
+  // Calculate width relative to the content area (which has padding: 20px)
+  // Get the actual available width of the content area
+  // Force a reflow to ensure dimensions are calculated
+  void contentArea.offsetWidth;
+  const contentAreaWidth = contentArea.offsetWidth || contentArea.clientWidth;
+  
+  // If width is 0, wait a bit for layout to complete
+  if (contentAreaWidth === 0) {
+    console.log('🎆 Fireworks: applyCellWidthFromSlider - content area width is 0, will retry');
+    setTimeout(() => {
+      applyCellWidthFromSlider();
+    }, 50);
+    return;
+  }
+  
+  if (contentAreaWidth > 0) {
+    // Account for padding (20px on each side = 40px total)
+    const availableWidth = contentAreaWidth - 40;
+    const actualWidth = (availableWidth * width / 100) + 'px';
+    
+    // Override min-width to allow max-width to work properly
+    cellsContainer.style.setProperty('max-width', actualWidth, 'important');
+    cellsContainer.style.setProperty('min-width', '0', 'important');
+    cellsContainer.style.setProperty('width', '100%', 'important');
+    cellsContainer.style.setProperty('margin', '0 auto', 'important');
+    console.log('🎆 Fireworks: Applied cell width:', actualWidth, '(', width + '%', 'of', availableWidth + 'px available width)');
+  } else {
+    // Fallback to percentage if we can't calculate
+    cellsContainer.style.setProperty('max-width', width + '%', 'important');
+    cellsContainer.style.setProperty('min-width', '0', 'important');
+    cellsContainer.style.setProperty('width', '100%', 'important');
+    cellsContainer.style.setProperty('margin', '0 auto', 'important');
+    console.log('🎆 Fireworks: Applied cell width:', width + '%', '(percentage fallback)');
+  }
+  
+  widthValueDisplay.textContent = width + '%';
+  widthSlider.value = width;
+}
+
 function setupWidthControl(container) {
   const widthSlider = container.querySelector('#fireworks-width-slider');
   const widthValueDisplay = container.querySelector('#fireworks-width-value');
@@ -1928,10 +2078,48 @@ function setupWidthControl(container) {
     const width = Math.max(50, Math.min(100, widthPercent));
     
     // Apply max-width to the notebook cells container (not width, to allow horizontal scroll)
-    const cellsContainer = container.querySelector('.fireworks-cells');
+    // Cells might be inside .fireworks-loading or directly in content
+    let cellsContainer = container.querySelector('.fireworks-cells');
+    if (!cellsContainer) {
+      const contentArea = container.querySelector('#fireworks-content-zoomable');
+      if (contentArea) {
+        cellsContainer = contentArea.querySelector('.fireworks-cells');
+      }
+    }
+    
     if (cellsContainer) {
-      cellsContainer.style.maxWidth = width + '%';
-      cellsContainer.style.margin = '0 auto';
+      // Calculate width relative to the content area
+      const contentArea = container.querySelector('#fireworks-content-zoomable');
+      if (contentArea) {
+        const contentAreaWidth = contentArea.offsetWidth || contentArea.clientWidth;
+        if (contentAreaWidth > 0) {
+          // Account for padding (20px on each side = 40px total)
+          const availableWidth = contentAreaWidth - 40;
+          const actualWidth = (availableWidth * width / 100) + 'px';
+          // Override min-width to allow max-width to work properly
+          cellsContainer.style.setProperty('max-width', actualWidth, 'important');
+          cellsContainer.style.setProperty('min-width', '0', 'important');
+          cellsContainer.style.setProperty('width', '100%', 'important');
+          cellsContainer.style.setProperty('margin', '0 auto', 'important');
+          console.log('🎆 Fireworks: updateWidth applied:', actualWidth, '(', width + '%', 'of', availableWidth + 'px)');
+        } else {
+          // Fallback to percentage
+          cellsContainer.style.setProperty('max-width', width + '%', 'important');
+          cellsContainer.style.setProperty('min-width', '0', 'important');
+          cellsContainer.style.setProperty('width', '100%', 'important');
+          cellsContainer.style.setProperty('margin', '0 auto', 'important');
+          console.log('🎆 Fireworks: updateWidth applied:', width + '%', '(percentage fallback)');
+        }
+      } else {
+        // Fallback if content area not found
+        cellsContainer.style.setProperty('max-width', width + '%', 'important');
+        cellsContainer.style.setProperty('min-width', '0', 'important');
+        cellsContainer.style.setProperty('width', '100%', 'important');
+        cellsContainer.style.setProperty('margin', '0 auto', 'important');
+        console.log('🎆 Fireworks: updateWidth applied:', width + '%', '(fallback - no content area)');
+      }
+    } else {
+      console.log('🎆 Fireworks: updateWidth - cells container not found');
     }
     
     widthValueDisplay.textContent = width + '%';
@@ -1944,11 +2132,20 @@ function setupWidthControl(container) {
   });
   
   // Initialize width - wait for cells to be loaded
+  // Use applyCellWidthFromSlider instead of updateWidth to ensure consistent behavior
   const checkForCells = setInterval(() => {
-    const cellsContainer = container.querySelector('.fireworks-cells');
-    if (cellsContainer) {
-      clearInterval(checkForCells);
-      updateWidth(80);
+    const contentArea = container.querySelector('#fireworks-content-zoomable');
+    if (contentArea) {
+      const cellsContainer = contentArea.querySelector('.fireworks-cells');
+      if (cellsContainer) {
+        const contentAreaWidth = contentArea.offsetWidth || contentArea.clientWidth;
+        // Only apply if content area has dimensions (layout is ready)
+        if (contentAreaWidth > 0) {
+          clearInterval(checkForCells);
+          // Use applyCellWidthFromSlider to ensure it uses the slider's current value (60)
+          applyCellWidthFromSlider();
+        }
+      }
     }
   }, 100);
   

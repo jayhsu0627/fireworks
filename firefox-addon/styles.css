@@ -353,13 +353,19 @@ a:hover .fireworks-preview-badge {
   }
 }
 
+/* Cells wrapper - container for cells when loading div is replaced */
+.fireworks-cells-wrapper {
+  width: 100%;
+  text-align: left;
+}
+
 /* Cells */
 .fireworks-cells {
   display: flex;
   flex-direction: column;
   gap: 15px;
   text-align: left;
-  max-width: 80%;
+  max-width: 60%;
   margin: 0 auto;
   transition: max-width 0.2s ease;
   min-width: min-content;
