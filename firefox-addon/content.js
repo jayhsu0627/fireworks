@@ -136,7 +136,7 @@ function injectViewer(downloadUrl, fileName) {
     }
     
     // Reset content to loading state
-    const content = container.querySelector('.fireworks-content');
+    const content = container.querySelector('#fireworks-content-zoomable');
     if (content) {
       content.innerHTML = `
         <div class="fireworks-loading">
@@ -159,16 +159,31 @@ function injectViewer(downloadUrl, fileName) {
     <div class="fireworks-viewer">
       <div class="fireworks-header">
         <h3>📓 Fireworks Notebook Viewer - ${escapeHtml(fileName)}</h3>
-        <button id="fireworks-close" class="fireworks-close">✕</button>
-      </div>
-      <div class="fireworks-content">
-        <div class="fireworks-loading">
-          <div class="fireworks-loading-text">Loading notebook...</div>
-          <div class="fireworks-progress-container">
-            <div class="fireworks-progress-bar"></div>
+        <div class="fireworks-header-controls">
+          <div class="fireworks-zoom-controls">
+            <button id="fireworks-zoom-out" class="fireworks-zoom-btn" title="Zoom Out">−</button>
+            <span id="fireworks-zoom-level" class="fireworks-zoom-level">100%</span>
+            <button id="fireworks-zoom-in" class="fireworks-zoom-btn" title="Zoom In">+</button>
+            <button id="fireworks-reset-zoom" class="fireworks-zoom-btn" title="Reset Zoom">⟲</button>
           </div>
+          <div class="fireworks-width-control">
+            <label for="fireworks-width-slider" style="font-size: 12px; margin-right: 8px;">Cell Width:</label>
+            <input type="range" id="fireworks-width-slider" min="50" max="100" value="80" style="width: 80px; margin-right: 8px;">
+            <span id="fireworks-width-value" class="fireworks-width-value">80%</span>
+          </div>
+          <button id="fireworks-close" class="fireworks-close">✕</button>
         </div>
-        <iframe id="fireworks-iframe" style="display:none;"></iframe>
+      </div>
+      <div class="fireworks-content-wrapper">
+        <div class="fireworks-content" id="fireworks-content-zoomable">
+          <div class="fireworks-loading">
+            <div class="fireworks-loading-text">Loading notebook...</div>
+            <div class="fireworks-progress-container">
+              <div class="fireworks-progress-bar"></div>
+            </div>
+          </div>
+          <iframe id="fireworks-iframe" style="display:none;"></iframe>
+        </div>
       </div>
     </div>
   `;
@@ -182,6 +197,12 @@ function injectViewer(downloadUrl, fileName) {
     viewerIsOpen = false;
     currentNotebookUrl = null;
   });
+  
+  // Setup zoom controls
+  setupZoomControls(container);
+  
+  // Setup width control
+  setupWidthControl(container);
   
   // Also close on background click
   container.addEventListener('click', (e) => {
@@ -280,7 +301,10 @@ function fetchAndDisplayNotebook(downloadUrl) {
 }
 
 function displayNotebookPreview(notebook) {
-  const loading = document.querySelector('.fireworks-loading');
+  const notebookContentArea = document.querySelector('#fireworks-content-zoomable') || 
+                              document.querySelector('.fireworks-content');
+  const loading = notebookContentArea ? notebookContentArea.querySelector('.fireworks-loading') : 
+                  document.querySelector('.fireworks-loading');
   const cells = notebook.cells || [];
   
   console.log("🎆 Fireworks: Displaying notebook with", cells.length, "cells");
@@ -422,7 +446,11 @@ function displayNotebookPreview(notebook) {
   footer.innerHTML = `
     <p>Tip: For full functionality and to run cells, download the notebook and use Jupyter locally.</p>
   `;
-  document.querySelector('.fireworks-content').appendChild(footer);
+  const footerContentArea = document.querySelector('#fireworks-content-zoomable') || 
+                            document.querySelector('.fireworks-content');
+  if (footerContentArea) {
+    footerContentArea.appendChild(footer);
+  }
   
   // Search and highlight saved text if available
   const browserAPI = BROWSER === 'chrome' ? chrome : browser;
@@ -436,7 +464,8 @@ function displayNotebookPreview(notebook) {
         let retryCount = 0;
         const maxRetries = 15; // Increased retries
         const tryHighlight = () => {
-          const content = document.querySelector('.fireworks-content');
+          const content = document.querySelector('#fireworks-content-zoomable') || 
+                          document.querySelector('.fireworks-content');
           const textContent = content ? (content.textContent || content.innerText || '') : '';
           // Use case-insensitive search
           const searchRegex = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -463,7 +492,8 @@ function displayNotebookPreview(notebook) {
 }
 
 function highlightAndScrollToText(searchText) {
-  const content = document.querySelector('.fireworks-content');
+  const content = document.querySelector('#fireworks-content-zoomable') || 
+                  document.querySelector('.fireworks-content');
   if (!content || !searchText) {
     console.log("🎆 Fireworks: highlightAndScrollToText - missing content or searchText");
     return;
@@ -1814,4 +1844,89 @@ function startGradescopeAutopilot(scoreDigit) {
   }
 
   step();
+}
+
+// ================================
+// Zoom and Width Controls
+// ================================
+
+function setupZoomControls(container) {
+  const zoomInBtn = container.querySelector('#fireworks-zoom-in');
+  const zoomOutBtn = container.querySelector('#fireworks-zoom-out');
+  const resetZoomBtn = container.querySelector('#fireworks-reset-zoom');
+  const zoomLevelDisplay = container.querySelector('#fireworks-zoom-level');
+  const contentArea = container.querySelector('#fireworks-content-zoomable');
+  
+  if (!zoomInBtn || !zoomOutBtn || !resetZoomBtn || !zoomLevelDisplay || !contentArea) {
+    console.warn('🎆 Fireworks: Zoom controls not found');
+    return;
+  }
+  
+  let currentZoom = 100;
+  
+  function updateZoom(zoom) {
+    currentZoom = Math.max(50, Math.min(200, zoom)); // Limit between 50% and 200%
+    contentArea.style.transform = `scale(${currentZoom / 100})`;
+    contentArea.style.transformOrigin = 'top left';
+    zoomLevelDisplay.textContent = currentZoom + '%';
+  }
+  
+  zoomInBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updateZoom(currentZoom + 10);
+  });
+  
+  zoomOutBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updateZoom(currentZoom - 10);
+  });
+  
+  resetZoomBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updateZoom(100);
+  });
+  
+  // Initialize zoom
+  updateZoom(100);
+}
+
+function setupWidthControl(container) {
+  const widthSlider = container.querySelector('#fireworks-width-slider');
+  const widthValueDisplay = container.querySelector('#fireworks-width-value');
+  
+  if (!widthSlider || !widthValueDisplay) {
+    console.warn('🎆 Fireworks: Width controls not found');
+    return;
+  }
+  
+  function updateWidth(widthPercent) {
+    const width = Math.max(50, Math.min(100, widthPercent));
+    
+    // Apply max-width to the notebook cells container (not width, to allow horizontal scroll)
+    const cellsContainer = container.querySelector('.fireworks-cells');
+    if (cellsContainer) {
+      cellsContainer.style.maxWidth = width + '%';
+      cellsContainer.style.margin = '0 auto';
+    }
+    
+    widthValueDisplay.textContent = width + '%';
+    widthSlider.value = width;
+  }
+  
+  widthSlider.addEventListener('input', (e) => {
+    e.stopPropagation();
+    updateWidth(parseInt(e.target.value));
+  });
+  
+  // Initialize width - wait for cells to be loaded
+  const checkForCells = setInterval(() => {
+    const cellsContainer = container.querySelector('.fireworks-cells');
+    if (cellsContainer) {
+      clearInterval(checkForCells);
+      updateWidth(80);
+    }
+  }, 100);
+  
+  // Stop checking after 5 seconds
+  setTimeout(() => clearInterval(checkForCells), 5000);
 }

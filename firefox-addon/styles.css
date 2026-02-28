@@ -43,12 +43,13 @@ a:hover .fireworks-preview-badge {
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-start;
-  padding-left: 2%;
+  padding: 2% 0 2% 2%;
   z-index: 10000;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   animation: fireworks-fadeIn 0.3s ease;
+  overflow: auto;
 }
 
 @keyframes fireworks-fadeIn {
@@ -66,19 +67,90 @@ a:hover .fireworks-preview-badge {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   width: 80%;
   max-width: none;
-  max-height: 90vh;
+  max-height: 96vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin: 0;
 }
 
 .fireworks-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 15px 20px;
   border-bottom: 1px solid #e0e0e0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fireworks-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fireworks-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.fireworks-zoom-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.fireworks-zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.fireworks-zoom-level {
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 45px;
+  text-align: center;
+  color: white;
+}
+
+.fireworks-width-control {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+}
+
+.fireworks-width-control input[type="range"] {
+  cursor: pointer;
+}
+
+.fireworks-width-value {
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 35px;
+  text-align: center;
   color: white;
 }
 
@@ -188,11 +260,23 @@ a:hover .fireworks-preview-badge {
   background: #d0d0d0;
 }
 
-.fireworks-content {
+.fireworks-content-wrapper {
   flex: 1;
+  overflow: auto;
+  overflow-x: auto;
   overflow-y: auto;
+  position: relative;
+}
+
+.fireworks-content {
   padding: 20px;
   text-align: left;
+  transition: transform 0.2s ease;
+  min-width: min-content;
+}
+
+#fireworks-content-zoomable {
+  transform-origin: top left;
 }
 
 .fireworks-loading {
@@ -275,6 +359,10 @@ a:hover .fireworks-preview-badge {
   flex-direction: column;
   gap: 15px;
   text-align: left;
+  max-width: 80%;
+  margin: 0 auto;
+  transition: max-width 0.2s ease;
+  min-width: min-content;
 }
 
 .fireworks-cell {
@@ -533,8 +621,28 @@ a:hover .fireworks-preview-badge {
 }
 
 /* Scrollbar Styling */
+.fireworks-content-wrapper::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.fireworks-content-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.fireworks-content-wrapper::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.fireworks-content-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Also style scrollbars for content area */
 .fireworks-content::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 .fireworks-content::-webkit-scrollbar-track {
