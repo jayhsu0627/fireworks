@@ -28,6 +28,36 @@ Gradescope hides notebook files larger than 1MB and displays the message **"Larg
 
    ![Download Progress](img/download.png)
 
+## Local LLM Auto-Grading (with vLLM and Gemma 4)
+
+Fireworks includes a powerful AI-assisted grading feature that can evaluate student answers based on a rubric you provide, running completely locally on your machine using vLLM and large language models like Google's Gemma 4.
+
+### 1. Setup vLLM Server Locally
+
+To use this feature, you first need to start a local OpenAI-compatible inference server. We recommend using `vLLM` with the `google/gemma-4-31B-it` model. 
+
+Open your terminal and run (make sure you have a GPU with sufficient VRAM):
+
+```bash
+# For Gemma-4-31B-it (requires ~24GB+ VRAM, limit context length to save memory)
+python -m vllm.entrypoints.openai.api_server --host 127.0.0.1 --port 8000 --model google/gemma-4-31B-it --enforce-eager --max-model-len 32768
+```
+
+### 2. Configure Fireworks in Gradescope
+
+1. Navigate to a Gradescope question grading page.
+2. Click on a student's answer text box. The Fireworks grading popup will appear.
+3. **Set the Question:** Paste the exam question into the "Question" box.
+4. **Set the Rubric:** Add rows for each grading criteria with the corresponding point values. The extension automatically maps these to keyboard shortcuts (1, 2, 3...).
+5. **vLLM Configuration:** 
+   - Model Name: `google/gemma-4-31B-it`
+   - URL: `http://localhost:8000/v1/chat/completions` (Important: use the `/chat/completions` endpoint for instruction-tuned models).
+6. **Auto-advance (Optional):** Check the "Auto-advance" box if you want the extension to grade, apply the score, and immediately move to the next submission automatically. If unchecked, you can manually review the score and click "Next submission" to apply it and proceed.
+
+### 3. Start Grading
+
+Click **"Grade Answer"**. The extension will send the student's answer, the question, and your rubric to your local vLLM server. The model will evaluate the response, choose a point value from your rubric, and the extension will automatically simulate Gradescope keyboard shortcuts to apply the score!
+
 ## Installation
 
 ### Chrome Installation

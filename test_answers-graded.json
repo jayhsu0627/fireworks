@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "studentResponse": "The p-value is the probability of obtaining the observed result or more extreme, assuming the null hypothesis is true. A small p-value gives us evidence against the null hypothesis.",
+    "llmGrading": {
+      "points": 4,
+      "shortcut": "1",
+      "feedback": "The student provided the full definition (observed or more extreme, assuming H0 is true) and correctly linked a small p-value to evidence against the null."
+    }
+  },
+  {
+    "id": 2,
+    "studentResponse": "A p-value tells you if you should reject the null hypothesis. It is the probability that the null hypothesis is true.",
+    "llmGrading": {
+      "points": 2,
+      "shortcut": "2",
+      "feedback": "The student incorrectly defines the p-value as the probability that the null hypothesis is true."
+    }
+  },
+  {
+    "id": 3,
+    "studentResponse": "I don't know, it's just a number you use in stats to reject the null.",
+    "llmGrading": {
+      "points": 0,
+      "shortcut": "3",
+      "feedback": "The answer is fundamentally incorrect and provides no statistical interpretation."
+    }
+  }
+]

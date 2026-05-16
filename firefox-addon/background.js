@@ -3,7 +3,7 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('Fireworks extension installed');
 });
 
-// Handle fetch requests from content script to avoid CORS issues
+// Handle fetch requests from content script to avoid CORS / mixed-content issues
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fetchNotebook') {
     // Store the tab ID from the sender
@@ -557,6 +557,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     
     // Return true to indicate we'll send a response asynchronously
+    return true;
+  }
+
+  // Proxy vLLM grading requests from the content script
+  if (request.action === 'vllmFetch') {
+    const { url, body } = request;
+    console.log('🎆 Fireworks [Background]: vllmFetch to', url);
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = { raw: text };
+        }
+        sendResponse({
+          ok: res.ok,
+          status: res.status,
+          data,
+        });
+      })
+      .catch((err) => {
+        console.error('🎆 Fireworks [Background]: vllmFetch error:', err);
+        sendResponse({
+          ok: false,
+          status: 0,
+          error: err.message || String(err),
+        });
+      });
+
+    // Keep the message channel open for async response
     return true;
   }
 });

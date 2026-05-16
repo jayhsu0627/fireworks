@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "studentResponse": "The p-value is the probability of obtaining the observed result or more extreme, assuming the null hypothesis is true. A small p-value gives us evidence against the null hypothesis."
+  },
+  {
+    "id": 2,
+    "studentResponse": "A p-value tells you if you should reject the null hypothesis. It is the probability that the null hypothesis is true."
+  },
+  {
+    "id": 3,
+    "studentResponse": "I don't know, it's just a number you use in stats to reject the null."
+  }
+]
