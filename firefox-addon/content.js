@@ -4250,7 +4250,7 @@ python -m vllm.entrypoints.openai.api_server \
           } catch(e) {}
         }
         if (!foundElement) {
-          const newCandidates = findStudentAnswerElements();
+          const newCandidates = extractStudentAnswers();
           if (newCandidates.length > 0) {
             const bestMatch = newCandidates[selectedAnswerIndex] || newCandidates[0];
             updatedText = bestMatch.text;

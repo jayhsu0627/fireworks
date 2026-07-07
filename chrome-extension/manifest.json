@@ -14,7 +14,9 @@
     "*://*.gradescope.com/*",
     "*://production-gradescope-uploads.s3-us-west-2.amazonaws.com/*",
     "*://*.s3.amazonaws.com/*",
-    "*://*.s3-us-west-2.amazonaws.com/*"
+    "*://*.s3-us-west-2.amazonaws.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   
   "content_scripts": [
