@@ -3777,19 +3777,33 @@ function showExamGradingViewer(answerCandidates) {
             <div id="fireworks-key-mapping" style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; max-height: 140px; overflow-y: auto; background: #f9fafb;"></div>
           </div>
           <div class="fireworks-exam-section">
-            <h4>vLLM Configuration:</h4>
+            <h4>Grading model:</h4>
+            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+              <button type="button" id="fireworks-use-haiku" style="padding: 6px 10px; border: none; border-radius: 4px; font-size: 12px; font-weight: 500; cursor: pointer; background: #d97706; color: white;">Use Claude Haiku 5.5</button>
+              <button type="button" id="fireworks-use-gemma" style="padding: 6px 10px; border: none; border-radius: 4px; font-size: 12px; font-weight: 500; cursor: pointer; background: #4b5563; color: white;">Use local Gemma 4</button>
+            </div>
             <label style="display: flex; flex-direction: column; font-size: 14px; color: #333; font-weight: 500; margin-bottom: 10px;">
               Model Name:
-              <input type="text" id="fireworks-vllm-model" value="google/gemma-4-31B-it" placeholder="google/gemma-4-31B-it" style="width: 100%; margin-top: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+              <input type="text" id="fireworks-vllm-model" value="claude-haiku-5-5" placeholder="claude-haiku-5-5" style="width: 100%; margin-top: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
             </label>
-            <p style="font-size: 12px; color: #666; margin: 5px 0 10px 0;">
-              <strong>⚠️ GPU Required:</strong> vLLM requires a GPU with sufficient VRAM. Estimated VRAM: <span id="fireworks-vram-estimate">~6GB</span>
+            <p id="fireworks-vram-note" style="font-size: 12px; color: #666; margin: 5px 0 10px 0; display: none;">
+              <strong>GPU Required:</strong> vLLM requires a GPU with sufficient VRAM. Estimated VRAM: <span id="fireworks-vram-estimate">~6GB</span>
             </p>
             <label style="display: flex; align-items: center; font-size: 14px; color: #333; font-weight: 500; margin-bottom: 10px; cursor: pointer;">
               <input type="checkbox" id="fireworks-use-http" checked>
-              Use HTTP API (vLLM server must be running):
-              <input type="text" id="fireworks-vllm-url" value="http://localhost:8000/v1/chat/completions" style="width: 250px; margin-left: 10px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
+              Use HTTP API
             </label>
+            <label style="display: flex; flex-direction: column; font-size: 14px; color: #333; font-weight: 500; margin-bottom: 10px;">
+              API URL:
+              <input type="text" id="fireworks-vllm-url" value="https://api.anthropic.com/v1/chat/completions" style="width: 100%; margin-top: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+            </label>
+            <label id="fireworks-anthropic-key-label" style="display: flex; flex-direction: column; font-size: 14px; color: #333; font-weight: 500; margin-bottom: 4px;">
+              Claude API key:
+              <input type="password" id="fireworks-anthropic-key" autocomplete="off" spellcheck="false" placeholder="sk-ant-api..." style="width: 100%; margin-top: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+            </label>
+            <p id="fireworks-anthropic-key-status" style="font-size: 12px; color: #666; margin: 0 0 10px 0;">
+              Saved in extension storage. The field is cleared after grading so the key does not stay in the page.
+            </p>
             <label style="display: flex; align-items: center; font-size: 14px; color: #333; font-weight: 500; margin-bottom: 10px; cursor: pointer;">
               <input type="checkbox" id="fireworks-auto-advance" checked>
               Auto-advance to next page after grading (press 'z' to stop)
@@ -3811,7 +3825,13 @@ python -m vllm.entrypoints.openai.api_server \
   --enforce-eager \
   --max-model-len 32768
 
-# Then keep URL as: http://127.0.0.1:8000/v1/chat/completions
+# Then set model to google/gemma-4-31B-it
+# and URL to http://127.0.0.1:8000/v1/chat/completions
+
+# Claude Haiku 5.5 (no local GPU):
+# model claude-haiku-5-5
+# URL https://api.anthropic.com/v1/chat/completions
+# plus a Claude API key from platform.claude.com
               </pre>
             </div>
           </div>
@@ -4136,7 +4156,42 @@ python -m vllm.entrypoints.openai.api_server \
   
   // Model selection and VRAM estimation
   const modelInput = container.querySelector('#fireworks-vllm-model');
+  const urlInput = container.querySelector('#fireworks-vllm-url');
+  const apiKeyInput = container.querySelector('#fireworks-anthropic-key');
+  const apiKeyStatus = container.querySelector('#fireworks-anthropic-key-status');
+  const vramNote = container.querySelector('#fireworks-vram-note');
   const vramEstimate = container.querySelector('#fireworks-vram-estimate');
+  const HAIKU_MODEL = 'claude-haiku-5-5';
+  const HAIKU_URL = 'https://api.anthropic.com/v1/chat/completions';
+  const GEMMA_MODEL = 'google/gemma-4-31B-it';
+  const GEMMA_URL = 'http://127.0.0.1:8000/v1/chat/completions';
+  let savedAnthropicKey = '';
+
+  function isClaudeUrl(url) {
+    return (url || '').includes('api.anthropic.com');
+  }
+
+  function updateProviderHint() {
+    const claude = isClaudeUrl(urlInput.value);
+    if (vramNote) vramNote.style.display = claude ? 'none' : '';
+    if (apiKeyStatus && !apiKeyInput.value) {
+      apiKeyStatus.textContent = savedAnthropicKey
+        ? 'API key saved in extension storage. Leave this blank to keep it, or type a new key to replace it.'
+        : 'Paste a Claude API key for api.anthropic.com. It is saved in extension storage and cleared from this field after grading.';
+    }
+  }
+
+  function resolveAnthropicKey() {
+    const typed = (apiKeyInput.value || '').trim();
+    if (typed) {
+      savedAnthropicKey = typed;
+      apiKeyInput.value = '';
+      storageAPI.set({ fireworksAnthropicApiKey: typed }, () => {});
+      updateProviderHint();
+      return typed;
+    }
+    return savedAnthropicKey;
+  }
   
   // Simple VRAM estimation based on model size
   const vramEstimates = {
@@ -4166,21 +4221,45 @@ python -m vllm.entrypoints.openai.api_server \
   }
   
   modelInput.addEventListener('input', updateVRAMEstimate);
+  urlInput.addEventListener('input', updateProviderHint);
   updateVRAMEstimate();
+  updateProviderHint();
+
+  const useHaikuBtn = container.querySelector('#fireworks-use-haiku');
+  const useGemmaBtn = container.querySelector('#fireworks-use-gemma');
+  if (useHaikuBtn) {
+    useHaikuBtn.addEventListener('click', () => {
+      modelInput.value = HAIKU_MODEL;
+      urlInput.value = HAIKU_URL;
+      updateVRAMEstimate();
+      updateProviderHint();
+    });
+  }
+  if (useGemmaBtn) {
+    useGemmaBtn.addEventListener('click', () => {
+      modelInput.value = GEMMA_MODEL;
+      urlInput.value = GEMMA_URL;
+      updateVRAMEstimate();
+      updateProviderHint();
+    });
+  }
   
   // Load saved settings
   const browserAPI = BROWSER === 'chrome' ? chrome : browser;
   const storageAPI = browserAPI.storage.local || browserAPI.storage.sync;
-  storageAPI.get(['fireworksVllmUrl', 'fireworksVllmModel'], (result) => {
-    if (!browserAPI.runtime.lastError) {
+  storageAPI.get(['fireworksVllmUrl', 'fireworksVllmModel', 'fireworksAnthropicApiKey'], (result) => {
+    if (!browserAPI.runtime.lastError && result) {
       if (result.fireworksVllmUrl) {
-        const urlInput = container.querySelector('#fireworks-vllm-url');
-        if (urlInput) urlInput.value = result.fireworksVllmUrl;
+        urlInput.value = result.fireworksVllmUrl;
       }
       if (result.fireworksVllmModel) {
         modelInput.value = result.fireworksVllmModel;
         updateVRAMEstimate();
       }
+      if (result.fireworksAnthropicApiKey) {
+        savedAnthropicKey = result.fireworksAnthropicApiKey;
+      }
+      updateProviderHint();
     }
   });
   
@@ -4291,13 +4370,19 @@ python -m vllm.entrypoints.openai.api_server \
   gradeBtn.addEventListener('click', async () => {
     const useHttp = container.querySelector('#fireworks-use-http').checked;
     const model = modelInput.value.trim();
-    const vllmUrl = container.querySelector('#fireworks-vllm-url').value.trim() || 'http://localhost:8000/v1/chat/completions';
+    const vllmUrl = urlInput.value.trim() || HAIKU_URL;
+    const apiKey = isClaudeUrl(vllmUrl) ? resolveAnthropicKey() : '';
     const statusDiv = container.querySelector('#fireworks-exam-status');
     const resultDiv = container.querySelector('#fireworks-exam-result');
     const resultContent = container.querySelector('#fireworks-exam-result-content');
     
     if (!useHttp) {
       alert('Please enable HTTP API to use browser-based grading.');
+      return;
+    }
+
+    if (isClaudeUrl(vllmUrl) && !apiKey) {
+      alert('Paste a Claude API key to grade with Haiku 5.5.');
       return;
     }
     
@@ -4456,7 +4541,7 @@ python -m vllm.entrypoints.openai.api_server \
           resultDiv.style.display = 'none';
           
           // Grade with vLLM
-          const gradeResult = await gradeWithVllm(currentAnswer, rubric, currentQuestion, vllmUrl, model);
+          const gradeResult = await gradeWithVllm(currentAnswer, rubric, currentQuestion, vllmUrl, model, apiKey);
           
           // Display result briefly
           resultContent.innerHTML = `
@@ -4593,7 +4678,7 @@ python -m vllm.entrypoints.openai.api_server \
     resultDiv.style.display = 'none';
     
     try {
-      const gradeResult = await gradeWithVllm(currentAnswer, rubric, currentQuestion, vllmUrl, model);
+      const gradeResult = await gradeWithVllm(currentAnswer, rubric, currentQuestion, vllmUrl, model, apiKey);
       
       // Display result
       resultContent.innerHTML = `
@@ -4769,8 +4854,8 @@ if __name__ == "__main__":
 }
 
 // Grade student answer using vLLM
-async function gradeWithVllm(studentAnswer, rubric, question, vllmUrl, model = 'default') {
-  console.log("🎆 Fireworks: Grading with vLLM at", vllmUrl);
+async function gradeWithVllm(studentAnswer, rubric, question, vllmUrl, model = 'default', apiKey = '') {
+  console.log("🎆 Fireworks: Grading at", vllmUrl, "model", model);
   
   // Format rubric for prompt
   const rubricFormatted = rubric.split('\n').map(line => {
@@ -4822,6 +4907,7 @@ Do NOT output any other numbers besides the SCORE value.`;
           action: 'vllmFetch',
           url: vllmUrl,
           body: requestBody,
+          apiKey: apiKey || '',
         },
         (response) => {
           const lastError = browserAPI.runtime && browserAPI.runtime.lastError;
@@ -4838,7 +4924,7 @@ Do NOT output any other numbers besides the SCORE value.`;
     if (!bgResponse || !bgResponse.ok) {
       if (bgResponse && bgResponse.status) {
         throw new Error(
-          `vLLM API error (${bgResponse.status}): ${
+          `Grading API error (${bgResponse.status}): ${
             bgResponse.data ? JSON.stringify(bgResponse.data) : bgResponse.error || 'Unknown error'
           }`
         );
@@ -4883,7 +4969,7 @@ Do NOT output any other numbers besides the SCORE value.`;
     
   } catch (error) {
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error('Could not connect to vLLM API. Make sure vLLM is running at ' + vllmUrl);
+      throw new Error('Could not connect to the grading API at ' + vllmUrl);
     }
     throw error;
   }

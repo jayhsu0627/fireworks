@@ -17,6 +17,7 @@
     "*://*.s3-us-west-2.amazonaws.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
+    "https://api.anthropic.com/*",
     "activeTab",
     "storage"
   ],

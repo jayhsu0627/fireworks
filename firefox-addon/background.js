@@ -560,16 +560,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // Proxy vLLM grading requests from the content script
+  // Proxy grading requests from the content script (local vLLM or Claude)
   if (request.action === 'vllmFetch') {
-    const { url, body } = request;
+    const { url, body, apiKey } = request;
     console.log('🎆 Fireworks [Background]: vllmFetch to', url);
+
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    if (apiKey) {
+      headers.Authorization = 'Bearer ' + apiKey;
+    }
 
     fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     })
       .then(async (res) => {
