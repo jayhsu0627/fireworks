@@ -575,6 +575,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // sk-ant-usr personal keys authenticate with x-api-key, not Bearer.
       headers['x-api-key'] = apiKey.trim();
       headers['anthropic-version'] = '2023-06-01';
+      headers['anthropic-dangerous-direct-browser-access'] = 'true';
       requestUrl = 'https://api.anthropic.com/v1/messages';
       requestBody = toAnthropicMessagesBody(body);
     } else if (apiKey) {
