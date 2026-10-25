@@ -563,19 +563,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Proxy grading requests from the content script (local vLLM or Claude)
   if (request.action === 'vllmFetch') {
     const { url, body, apiKey } = request;
-    console.log('🎆 Fireworks [Background]: vllmFetch to', url);
+    const isAnthropic = typeof url === 'string' && url.includes('api.anthropic.com');
+    console.log('🎆 Fireworks [Background]: vllmFetch to', url, isAnthropic ? '(anthropic x-api-key)' : '');
 
     const headers = {
       'Content-Type': 'application/json',
     };
-    if (apiKey) {
-      headers.Authorization = 'Bearer ' + apiKey;
+    let requestUrl = url;
+    let requestBody = body;
+    if (apiKey && isAnthropic) {
+      // sk-ant-usr personal keys authenticate with x-api-key, not Bearer.
+      headers['x-api-key'] = apiKey.trim();
+      headers['anthropic-version'] = '2023-06-01';
+      requestUrl = 'https://api.anthropic.com/v1/messages';
+      requestBody = toAnthropicMessagesBody(body);
+    } else if (apiKey) {
+      headers.Authorization = 'Bearer ' + apiKey.trim();
     }
 
-    fetch(url, {
+    fetch(requestUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
     })
       .then(async (res) => {
         const text = await res.text();
@@ -584,6 +593,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           data = JSON.parse(text);
         } catch (e) {
           data = { raw: text };
+        }
+        if (isAnthropic && data && !data.choices && Array.isArray(data.content)) {
+          const text = data.content
+            .filter((block) => block && block.type === 'text')
+            .map((block) => block.text || '')
+            .join('');
+          data = { choices: [{ message: { role: 'assistant', content: text } }] };
         }
         sendResponse({
           ok: res.ok,
@@ -604,4 +620,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+function toAnthropicMessagesBody(body) {
+  const source = body || {};
+  const messages = Array.isArray(source.messages) ? source.messages : [];
+  const systemParts = [];
+  const chat = [];
+  messages.forEach((message) => {
+    if (!message) return;
+    const text = typeof message.content === 'string' ? message.content : '';
+    if (message.role === 'system' || message.role === 'developer') {
+      if (text) systemParts.push(text);
+      return;
+    }
+    if (message.role === 'user' || message.role === 'assistant') {
+      chat.push({ role: message.role, content: text });
+    }
+  });
+  if (!chat.length) {
+    chat.push({ role: 'user', content: typeof source.prompt === 'string' ? source.prompt : '' });
+  }
+  const out = {
+    model: source.model,
+    max_tokens: source.max_tokens || 120,
+    messages: chat,
+  };
+  if (systemParts.length) out.system = systemParts.join('\n');
+  return out;
+}
 

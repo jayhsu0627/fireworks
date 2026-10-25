@@ -4181,8 +4181,17 @@ python -m vllm.entrypoints.openai.api_server \
     }
   }
 
+  function cleanApiKey(value) {
+    let key = (value || '').trim();
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+      key = key.slice(1, -1).trim();
+    }
+    key = key.replace(/^bearer\s+/i, '').trim();
+    return key;
+  }
+
   function resolveAnthropicKey() {
-    const typed = (apiKeyInput.value || '').trim();
+    const typed = cleanApiKey(apiKeyInput.value);
     if (typed) {
       savedAnthropicKey = typed;
       apiKeyInput.value = '';
@@ -4190,7 +4199,7 @@ python -m vllm.entrypoints.openai.api_server \
       updateProviderHint();
       return typed;
     }
-    return savedAnthropicKey;
+    return cleanApiKey(savedAnthropicKey);
   }
   
   // Simple VRAM estimation based on model size
