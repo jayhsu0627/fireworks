@@ -600,7 +600,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .filter((block) => block && block.type === 'text')
             .map((block) => block.text || '')
             .join('');
-          data = { choices: [{ message: { role: 'assistant', content: text } }] };
+          const visible = text.trim()
+            ? text
+            : `No visible reply (stop_reason: ${data.stop_reason || 'unknown'}).`;
+          data = { choices: [{ message: { role: 'assistant', content: visible } }] };
         }
         sendResponse({
           ok: res.ok,
@@ -643,7 +646,11 @@ function toAnthropicMessagesBody(body) {
   }
   const out = {
     model: source.model,
-    max_tokens: source.max_tokens || 120,
+    max_tokens: Math.max(source.max_tokens || 120, 256),
+    // Haiku 5.5 thinks by default, and thinking tokens count toward max_tokens.
+    // A 120-token cap can end the turn before any SCORE line is written.
+    thinking: { type: 'disabled' },
+    output_config: { effort: 'low' },
     messages: chat,
   };
   if (systemParts.length) out.system = systemParts.join('\n');
